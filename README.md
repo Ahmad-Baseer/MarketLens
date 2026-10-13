@@ -15,7 +15,7 @@ reports/      generated reports, e.g. data_quality.md
 legacy/       the previous screener, research and AKD CSV pulls (kept for reference)
 ```
 
-## Setup (once)
+## Setup (development machine)
 
 Needs Python 3.11+.
 
@@ -24,27 +24,38 @@ python -m venv .venv
 .venv\Scripts\python -m pip install -e "backend[dev]"
 ```
 
-## Load the data (once, ~2–3 hours, all automatic)
+## Running it — nothing is manual
+
+**Production (server):** one long-running process does everything.
 
 ```
-.venv\Scripts\python -m mbf backfill-prices        # daily prices 2000 -> today
-.venv\Scripts\python -m mbf seed-akd               # import legacy/akd_data once
-.venv\Scripts\python -m mbf ref                    # symbols, sectors, index levels
-.venv\Scripts\python -m mbf company-sweep          # fundamentals + report list
-.venv\Scripts\python -m mbf events --since 2024-01-01
-.venv\Scripts\python -m mbf adjust                 # dividend/bonus/rights adjustment
-.venv\Scripts\python -m mbf quality                # -> reports/data_quality.md
+.venv\Scripts\python -m mbf scheduler
 ```
 
-## Every evening (after 6 pm PKT)
+- On first start with an empty `data/` it **bootstraps** the whole store
+  (~2–3 hours: 26 years of prices, fundamentals, announcements). Interrupted?
+  Restart it — it resumes where it stopped.
+- Every weekday at **18:30 PKT** it runs the evening update: new session,
+  corporate-action adjustment, index levels, payouts, announcements, and fresh
+  fundamentals for every company that just filed results (~40 PSX requests).
+  If PSX is unreachable it retries every 30 minutes, up to 4 times.
+- Every **Saturday 10:00 PKT**: full fundamentals refresh, re-check of recent
+  holidays, data-quality report.
+- After every job it writes `data/status.json` (what ran, whether it worked,
+  what runs next) — `mbf status` prints it; the website's health page will
+  show it.
 
-```
-.venv\Scripts\python -m mbf update
-```
+In step 5 this process is packaged as a container next to the web app, so a
+deploy is "start the container" and that's it.
 
-Fetches the new session(s), re-adjusts prices, refreshes index levels,
-payouts and announcements, and re-reads fundamentals for any company that just
-filed results. Add `--full-sweep` once a week to refresh every company.
+**Testing on a laptop** (which sleeps, so a long-running process is awkward):
+register the evening update once with Windows Task Scheduler — see the
+`schtasks` line at the top of `scripts/run_daily.ps1`. The first run
+bootstraps if needed.
+
+**One-shot / debugging:** `mbf bootstrap`, `mbf update [--full-sweep]`, and the
+individual stages (`backfill-prices`, `adjust`, `company-sweep`, `events`,
+`quality`, …) — see `python -m mbf --help`.
 
 ## Tests
 
@@ -66,7 +77,8 @@ cd backend
 - **Point-in-time fundamentals.** Every company sweep is stored by date, and
   each reported figure keeps the date it was first seen, so backtests never use
   numbers before they were public. History before this pipeline started comes
-  from the one-time AKD import (2018+).
+  from a one-time import of earlier AKD pulls (`legacy/akd_data`, optional:
+  the scheduler imports it automatically if the files are present).
 - **Not everything PSX labels "equity" is a stock.** Futures (`MCB-OCTB`),
   government sukuk and T-bills (`P01GIS…`, `PK03TB…`), TFCs and the odd index
   code are filtered out before anything else runs.
