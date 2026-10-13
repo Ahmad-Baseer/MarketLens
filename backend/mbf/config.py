@@ -28,6 +28,10 @@ HISTORY_START = date(2000, 1, 1)     # /historical has nothing before 2000
 # So adjusted prices, total returns and next-open entries are only reliable
 # from this date. Older rows are kept, marked modern=False, for market context.
 MODERN_FROM = date(2013, 11, 4)
+# Ex-date = book-closure start minus the settlement lag, in sessions: T+2 until
+# PSX moved to T+1 in the week of 2026-02-09 (measured from 2,900 payouts: 90-97%
+# of ex-dates follow this rule exactly). Used to schedule dividend signals live.
+T1_SETTLEMENT_FROM = date(2026, 2, 9)
 # Aug-Dec 2008 the exchange held a price floor; almost nothing traded and
 # positions could not be exited. Backtests must treat it as untradeable.
 MARKET_FREEZE = (date(2008, 8, 27), date(2008, 12, 15))

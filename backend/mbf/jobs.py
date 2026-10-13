@@ -65,10 +65,17 @@ def bootstrap() -> dict:
 
 def daily_update(full_sweep: bool = False) -> dict:
     from mbf import adjust, market
-    from mbf.ingest import company, events, prices, reference
+    from mbf.ingest import company, events, intraday, prices, reference
     from mbf.psx.client import PSXClient
 
     with PSXClient() as c:
+        # intraday ticks exist only for the current session: grab them first,
+        # but only once the session is over (the job runs after 18:00 PKT)
+        if datetime.now(TZ).date() == prices.last_closed_session():
+            try:
+                intraday.capture(c)
+            except Exception as e:                           # never block the update on this
+                log.warning("intraday capture failed: %s", e)
         res = prices.update(c)
         prices.compact()
         daily, _ = adjust.run()
