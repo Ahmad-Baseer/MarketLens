@@ -54,6 +54,11 @@ def bootstrap() -> dict:
         if not store.path("events", "announcements.parquet").exists():
             events.update_payouts(c)
             events.update_announcements(c, ANNOUNCEMENTS_SINCE, prices.last_closed_session())
+        if not store.path("events", "psx_notices.parquet").exists():
+            events.update_notices(c, full=True)
+        if not store.path("ref", "holidays.parquet").exists():
+            from mbf.signals import calendar as sigcal
+            sigcal.update_holidays(c)
     if (not store.path("seed", "akd", "statements.parquet").exists()
             and (config.LEGACY_AKD_DIR / "mbf_statements.csv").exists()):
         akd_seed.run()                       # optional: only if the legacy files are present
@@ -84,6 +89,9 @@ def daily_update(full_sweep: bool = False) -> dict:
         reference.update_market_watch(c)
         reference.update_indices(c)
         events.update_payouts(c)
+        events.update_notices(c)
+        from mbf.signals import calendar as sigcal
+        sigcal.update_holidays(c)
         last = prices.last_closed_session()
         ann = events.update_announcements(c, last - timedelta(days=5), last)
         recent = ann[(ann["announced_at"] >= str(last - timedelta(days=5)))
@@ -92,9 +100,12 @@ def daily_update(full_sweep: bool = False) -> dict:
         syms = eq if full_sweep else sorted(set(recent["symbol"]) & set(eq))
         if syms:
             company.sweep(c, syms, with_reports=True)
-        return {"prices": {k: (v if k != "failed" else [str(d) for d in v]) for k, v in res.items()},
-                "companies_refreshed": len(syms), "psx_requests": c.requests,
-                "last_session": str(last)}
+        requests = c.requests
+    from mbf.signals import engine
+    sig = engine.run_evening(daily)
+    return {"prices": {k: (v if k != "failed" else [str(d) for d in v]) for k, v in res.items()},
+            "companies_refreshed": len(syms), "psx_requests": requests,
+            "last_session": str(last), "signals": sig}
 
 
 def weekly_maintenance() -> dict:
@@ -109,6 +120,8 @@ def weekly_maintenance() -> dict:
         prices.compact()
     quality.run()
     out["holidays_recovered"] = [str(d) for d in rec]
+    from mbf.signals import engine, par
+    par.build(engine._sessions(engine._daily()))
     return out
 
 

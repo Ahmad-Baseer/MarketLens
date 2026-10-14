@@ -90,9 +90,19 @@ def cmd_company_sweep(a):
 def cmd_events(a):
     from mbf.ingest import events, prices
     since = date.fromisoformat(a.since) if a.since else date.today() - timedelta(days=7)
+    from mbf.signals import calendar as sigcal
     with _client() as c:
         events.update_payouts(c)
         events.update_announcements(c, since, prices.last_closed_session())
+        events.update_notices(c, full=a.all_notices)
+        sigcal.update_holidays(c)
+
+
+def cmd_signals(a):
+    import json
+    from mbf.signals import engine
+    res = engine.run_evening(dry_run=a.dry_run)
+    print(json.dumps(res, indent=2, default=str))
 
 
 def cmd_quality(a):
@@ -103,8 +113,13 @@ def cmd_quality(a):
 
 def cmd_update(a):
     from mbf import jobs
-    ok = jobs.run_job("daily_update", lambda: jobs.daily_update(full_sweep=a.full_sweep))
+    ok = jobs.run_job("daily_update", lambda: jobs.daily_update(full_sweep=a.full_sweep), retries=a.retries)
     sys.exit(0 if ok else 1)
+
+
+def cmd_weekly(a):
+    from mbf import jobs
+    sys.exit(0 if jobs.run_job("weekly_maintenance", jobs.weekly_maintenance, retries=a.retries) else 1)
 
 
 def cmd_bootstrap(a):
@@ -152,13 +167,24 @@ def main(argv=None):
 
     p = sub.add_parser("events", help="payouts + announcements")
     p.add_argument("--since", help="YYYY-MM-DD for announcements (default: last 7 days)")
+    p.add_argument("--all-notices", action="store_true", help="re-read every PSX notice (first run)")
     p.set_defaults(fn=cmd_events)
+
+    p = sub.add_parser("signals", help="evening signal run: publish, backtest, track, web JSON")
+    p.add_argument("--dry-run", action="store_true",
+                   help="compute tonight's signals without adding them to the live ledger")
+    p.set_defaults(fn=cmd_signals)
 
     sub.add_parser("quality", help="write the data-quality report").set_defaults(fn=cmd_quality)
 
     p = sub.add_parser("update", help="daily incremental update (run after the close)")
     p.add_argument("--full-sweep", action="store_true", help="refresh fundamentals for every company")
+    p.add_argument("--retries", type=int, default=0, help="retry a failed run this many times, 30 min apart")
     p.set_defaults(fn=cmd_update)
+
+    p = sub.add_parser("weekly", help="weekly maintenance: full fundamentals, holiday re-check, quality report")
+    p.add_argument("--retries", type=int, default=0, help="retry a failed run this many times, 30 min apart")
+    p.set_defaults(fn=cmd_weekly)
 
     sub.add_parser("bootstrap", help="load everything into an empty store (resumable)").set_defaults(
         fn=cmd_bootstrap)
