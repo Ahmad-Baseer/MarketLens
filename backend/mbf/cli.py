@@ -1,16 +1,18 @@
 """Command line entry point:  python -m mbf <command>
 
-One-time setup (in this order):
-    mbf backfill-prices        ~1.5 h  daily prices 2000 -> today
-    mbf seed-akd               ~1 min  import legacy AKD files
-    mbf ref                    ~10 s   symbols, sectors, index levels
-    mbf company-sweep          ~30 min fundamentals snapshot + report list
-    mbf events --since 2024-01-01      payouts + announcements
-    mbf adjust                 ~1 min  corporate-action adjustment + market proxy
-    mbf quality                        data-quality report -> reports/
+Production / unattended — the only command a server needs:
+    mbf scheduler              bootstraps an empty store, then runs the evening
+                               update every weekday 18:30 PKT and weekly
+                               maintenance on Saturdays, forever
+    mbf status                 what ran last, whether it worked, what runs next
 
-Every evening after the close:
-    mbf update
+One-shot equivalents of what the scheduler does:
+    mbf bootstrap              load everything (resumable, skips what exists)
+    mbf update [--full-sweep]  the evening job
+
+Individual stages (development / debugging):
+    backfill-prices, recheck-holidays, compact, adjust, seed-akd, ref,
+    company-sweep, events, quality
 """
 from __future__ import annotations
 
@@ -88,9 +90,19 @@ def cmd_company_sweep(a):
 def cmd_events(a):
     from mbf.ingest import events, prices
     since = date.fromisoformat(a.since) if a.since else date.today() - timedelta(days=7)
+    from mbf.signals import calendar as sigcal
     with _client() as c:
         events.update_payouts(c)
         events.update_announcements(c, since, prices.last_closed_session())
+        events.update_notices(c, full=a.all_notices)
+        sigcal.update_holidays(c)
+
+
+def cmd_signals(a):
+    import json
+    from mbf.signals import engine
+    res = engine.run_evening(dry_run=a.dry_run)
+    print(json.dumps(res, indent=2, default=str))
 
 
 def cmd_quality(a):
@@ -100,30 +112,31 @@ def cmd_quality(a):
 
 
 def cmd_update(a):
-    """The evening job: everything incremental, in dependency order."""
-    from mbf import adjust, market
-    from mbf.ingest import company, events, prices, reference
-    with _client() as c:
-        res = prices.update(c)
-        logging.info("prices: %s", res)
-        prices.compact()
-        daily, _ = adjust.run()
-        market.build(daily)
-        reference.update_symbols(c)
-        reference.update_market_watch(c)
-        reference.update_indices(c)
-        events.update_payouts(c)
-        last = prices.last_closed_session()
-        ann = events.update_announcements(c, last - timedelta(days=5), last)
-        # refresh fundamentals for companies that just filed results
-        recent = ann[(ann["announced_at"] >= str(last - timedelta(days=5)))
-                     & ann["title"].str.contains("financial result", case=False, na=False)]
-        syms = sorted(set(recent["symbol"]) & set(reference.equity_symbols()))
-        if a.full_sweep:
-            syms = reference.equity_symbols()
-        if syms:
-            company.sweep(c, syms, with_reports=True)
-        logging.info("update done: %d PSX requests", c.requests)
+    from mbf import jobs
+    ok = jobs.run_job("daily_update", lambda: jobs.daily_update(full_sweep=a.full_sweep), retries=a.retries)
+    sys.exit(0 if ok else 1)
+
+
+def cmd_weekly(a):
+    from mbf import jobs
+    sys.exit(0 if jobs.run_job("weekly_maintenance", jobs.weekly_maintenance, retries=a.retries) else 1)
+
+
+def cmd_bootstrap(a):
+    from mbf import jobs
+    sys.exit(0 if jobs.run_job("bootstrap", jobs.bootstrap) else 1)
+
+
+def cmd_scheduler(a):
+    from mbf import jobs
+    jobs.scheduler(run_now=a.run_now)
+
+
+def cmd_status(a):
+    import json
+    from mbf import jobs
+    st = jobs.read_status()
+    print(json.dumps(st, indent=2, default=str) if st else "no jobs have run yet")
 
 
 def main(argv=None):
@@ -154,13 +167,31 @@ def main(argv=None):
 
     p = sub.add_parser("events", help="payouts + announcements")
     p.add_argument("--since", help="YYYY-MM-DD for announcements (default: last 7 days)")
+    p.add_argument("--all-notices", action="store_true", help="re-read every PSX notice (first run)")
     p.set_defaults(fn=cmd_events)
+
+    p = sub.add_parser("signals", help="evening signal run: publish, backtest, track, web JSON")
+    p.add_argument("--dry-run", action="store_true",
+                   help="compute tonight's signals without adding them to the live ledger")
+    p.set_defaults(fn=cmd_signals)
 
     sub.add_parser("quality", help="write the data-quality report").set_defaults(fn=cmd_quality)
 
     p = sub.add_parser("update", help="daily incremental update (run after the close)")
     p.add_argument("--full-sweep", action="store_true", help="refresh fundamentals for every company")
+    p.add_argument("--retries", type=int, default=0, help="retry a failed run this many times, 30 min apart")
     p.set_defaults(fn=cmd_update)
+
+    p = sub.add_parser("weekly", help="weekly maintenance: full fundamentals, holiday re-check, quality report")
+    p.add_argument("--retries", type=int, default=0, help="retry a failed run this many times, 30 min apart")
+    p.set_defaults(fn=cmd_weekly)
+
+    sub.add_parser("bootstrap", help="load everything into an empty store (resumable)").set_defaults(
+        fn=cmd_bootstrap)
+    p = sub.add_parser("scheduler", help="run unattended: bootstrap, then daily/weekly jobs forever")
+    p.add_argument("--run-now", action="store_true", help="also run the evening update immediately")
+    p.set_defaults(fn=cmd_scheduler)
+    sub.add_parser("status", help="last job results and next run").set_defaults(fn=cmd_status)
 
     a = ap.parse_args(argv)
     _setup_logging(a.verbose)
