@@ -92,6 +92,24 @@ class PSXClient:
             return r
         raise PSXError(f"{method} {path} failed after {self._retries + 1} attempts: {last_err}")
 
+    def download(self, path: str) -> bytes:
+        """A PSX document (notice/announcement PDF), throttled like every other call."""
+        for attempt in range(self._retries + 1):
+            self._throttle()
+            try:
+                r = self._http.get(path, headers={"Referer": config.PSX_BASE + "/"})
+                self.requests += 1
+            except httpx.TransportError:
+                time.sleep(2 * (attempt + 1))
+                continue
+            if r.status_code in (429, 500, 502, 503, 504) and attempt < self._retries:
+                time.sleep(3 * (attempt + 1))
+                continue
+            if r.status_code >= 400:
+                raise PSXError(f"GET {path} -> HTTP {r.status_code}")
+            return r.content
+        raise PSXError(f"GET {path} failed after {self._retries + 1} attempts")
+
     # ------------------------------------------------------------ endpoints
     def historical(self, d: date) -> str:
         """All symbols' OHLCV + LDCP for one trading day (HTML)."""
