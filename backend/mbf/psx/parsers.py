@@ -295,6 +295,26 @@ def parse_announcements(text: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def parse_notices(text: str) -> pd.DataFrame:
+    """PSX notices (announcement type E): date | time | title | attachment."""
+    rows = []
+    for tr in _doc(text).xpath("//tbody/tr"):
+        tds = tr.xpath("./td")
+        if len(tds) < 4:
+            continue
+        pdf = tds[3].xpath(".//a/@href")
+        m = re.search(r"/(\d+)(?:-\d+)?\.pdf", pdf[0]) if pdf else None
+        rows.append({"announced_at": _parse_dt(f"{_txt(tds[0])} {_txt(tds[1])}"),
+                     "title": _txt(tds[2]), "pdf_url": pdf[0] if pdf else None,
+                     "doc_id": m.group(1) if m else None})
+    return pd.DataFrame(rows, columns=["announced_at", "title", "pdf_url", "doc_id"])
+
+
+def announcement_total(text: str) -> int:
+    m = re.search(r'data-total="(\d+)"', text)
+    return int(m.group(1)) if m else 0
+
+
 # ------------------------------------------------------------ company reports
 def parse_company_reports(text: str, symbol: str) -> pd.DataFrame:
     rows = []

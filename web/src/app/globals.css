@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+/* Colour tokens: light by default, dark when the OS asks for it. */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #f0f2f5;
+  --line: #e2e6ec;
+  --ink: #0e1726;
+  --ink-2: #4a5568;
+  --ink-3: #8a94a6;
+  --brand: #0d7a6f;
+  --brand-2: #0a5f57;
+  --brand-soft: #e3f4f1;
+  --gain: #067a52;
+  --gain-soft: #e2f5ec;
+  --loss: #c0264b;
+  --loss-soft: #fbe7ec;
+  --warn: #a35a06;
+  --warn-soft: #fdf1df;
+  --info: #2457c5;
+  --info-soft: #e6eefc;
+  --shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px rgb(15 23 42 / 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0e13;
+    --surface: #10161d;
+    --surface-2: #151d26;
+    --line: #222c38;
+    --ink: #e7edf4;
+    --ink-2: #a3afbd;
+    --ink-3: #6b788a;
+    --brand: #3fd0bd;
+    --brand-2: #2bb3a2;
+    --brand-soft: #10302c;
+    --gain: #3ddc97;
+    --gain-soft: #0f2a20;
+    --loss: #ff6f8e;
+    --loss-soft: #33141d;
+    --warn: #f5b84a;
+    --warn-soft: #2f230d;
+    --info: #79a7ff;
+    --info-soft: #14213b;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.25);
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
+  --color-brand-soft: var(--brand-soft);
+  --color-gain: var(--gain);
+  --color-gain-soft: var(--gain-soft);
+  --color-loss: var(--loss);
+  --color-loss-soft: var(--loss-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --shadow-card: var(--shadow);
+}
+
+html {
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* numbers line up in tables and stat blocks */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--brand-soft);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 6px;
+}

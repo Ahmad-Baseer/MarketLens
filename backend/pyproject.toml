@@ -14,10 +14,12 @@ dependencies = [
     "duckdb>=1.0",
     "httpx>=0.27",
     "lxml>=5.0",
+    "pdfplumber>=0.11",       # PSX notices: holidays, index recompositions
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+ocr = ["rapidocr_onnxruntime>=1.3"]   # scanned PSX notices / report pages
 
 [project.scripts]
 mbf = "mbf.cli:main"
