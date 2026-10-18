@@ -22,7 +22,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from mbf import config, store
+from mbf import fundamentals, store
 
 log = logging.getLogger(__name__)
 
@@ -32,10 +32,10 @@ RET_CLIP = 0.5          # a +/-50% day in a top-100 name is almost surely a data
 
 
 def _shares_now() -> pd.Series:
-    snaps = sorted((config.DATA_DIR / "fundamentals" / "snapshots").glob("*"))
-    if not snaps:
+    # every company's latest share count, not just the newest (often partial) snapshot
+    eq = fundamentals.latest("equity")
+    if eq.empty:
         return pd.Series(dtype=float)
-    eq = pd.read_parquet(snaps[-1] / "equity.parquet")
     ff = eq["free_float_shares"].where(eq["free_float_shares"] > 0, eq["shares"])
     return pd.Series(ff.values, index=eq["symbol"]).dropna()
 
