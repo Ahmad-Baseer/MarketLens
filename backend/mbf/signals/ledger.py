@@ -83,7 +83,14 @@ def load(which: str = "all") -> pd.DataFrame:
     if which in ("all", "backtest"):
         parts.append(store.read_parquet(store.path(*BACKTEST)))
     parts = [p for p in parts if not p.empty]
-    return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+    if not parts:
+        return pd.DataFrame()
+    allp = pd.concat(parts, ignore_index=True)
+    # once a signal has been published live, the replay produces the same id again the
+    # next evening: keep exactly one row per id, the live one
+    order = allp["mode"].map({"live": 0}).fillna(1)
+    return (allp.assign(_o=order).sort_values("_o", kind="stable")
+                .drop_duplicates("id").drop(columns="_o").reset_index(drop=True))
 
 
 def _px(daily: pd.DataFrame) -> pd.DataFrame:

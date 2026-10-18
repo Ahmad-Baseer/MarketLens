@@ -14,7 +14,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from mbf import config, store
+from mbf import config, fundamentals, store
 from mbf.signals import dividend, ledger
 from mbf.signals.calendar import Calendar
 from mbf.signals.ledger import _json_default
@@ -87,24 +87,26 @@ def _names() -> pd.DataFrame:
 
 
 class _Fundamentals:
-    """Latest company snapshot, loaded once per run."""
+    """Each company's latest figures, loaded once per run (from whichever snapshot last
+    refreshed that company; the newest snapshot alone holds only that evening's reporters)."""
 
     def __init__(self):
-        snaps = sorted(store.path("fundamentals", "snapshots").glob("*"))
-        self.as_of = pd.Timestamp(snaps[-1].name) if snaps else None
-        self.f = store.read_parquet(snaps[-1] / "financials.parquet") if snaps else pd.DataFrame()
-        self.r = store.read_parquet(snaps[-1] / "ratios.parquet") if snaps else pd.DataFrame()
+        self.f = fundamentals.latest("financials")
+        self.r = fundamentals.latest("ratios")
         self.f_by = dict(tuple(self.f.groupby("symbol"))) if not self.f.empty else {}
         self.r_by = dict(tuple(self.r.groupby("symbol"))) if not self.r.empty else {}
 
     def get(self, symbol: str, signal_date: pd.Timestamp) -> dict | None:
         """Only for recent signals: an old signal's page must not show figures that
         were published after it."""
-        if self.as_of is None or signal_date < self.as_of - pd.Timedelta(days=60):
+        f = self.f_by.get(symbol, pd.DataFrame(columns=["kind", "item", "period", "value", "snapshot"]))
+        r = self.r_by.get(symbol, pd.DataFrame(columns=["kind", "item", "period", "value", "snapshot"]))
+        if f.empty:
             return None
-        f = self.f_by.get(symbol, pd.DataFrame(columns=["kind", "item", "period", "value"]))
-        r = self.r_by.get(symbol, pd.DataFrame(columns=["kind", "item", "period", "value"]))
-        out = {"as_of": self.as_of}
+        as_of = f["snapshot"].max()
+        if signal_date < as_of - pd.Timedelta(days=60):
+            return None
+        out = {"as_of": as_of}
         a = f[(f["kind"] == "annual") & (f["item"] == "EPS")].sort_values("period")
         if len(a):
             out["eps_annual"] = [{"period": p, "eps": float(v)} for p, v in zip(a["period"], a["value"])]
@@ -238,7 +240,7 @@ def write_all(daily: pd.DataFrame, feats: pd.DataFrame, cal: Calendar,
     # a live signal supersedes its backtest twin
     sig = sig.sort_values("mode", key=lambda m: m.map({"live": 0, "preview": 1, "backtest": 2})).drop_duplicates("id")
     st = stats(sig, out)
-    o_by = out.set_index("id") if not out.empty else pd.DataFrame()
+    o_by = out.drop_duplicates("id").set_index("id") if not out.empty else pd.DataFrame()
     asof = cal.last
     nxt = cal.shift(asof, 1)
     feats_today = feats[feats["date"] == asof]
