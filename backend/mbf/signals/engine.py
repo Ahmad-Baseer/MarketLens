@@ -21,6 +21,10 @@ from mbf.signals.calendar import Calendar
 log = logging.getLogger(__name__)
 
 BACKTEST_FROM = pd.Timestamp("2018-01-01")     # payout history (AKD) starts in 2018
+# A signal is only worth publishing while you can still act on it: the buy happens in the
+# last 30 minutes of the entry day (from 15:00 Mon-Thu), so a run that catches up later
+# than this (laptop asleep, job delayed) publishes nothing for that day.
+PUBLISH_CUTOFF = pd.Timedelta(hours=15)
 FEATURE_COLS = ["symbol", "date", "close", "atr_pct", "in_universe", "to_rank", "med_to20",
                 "dma50", "dma200", "r1", "r5", "r20", "vol_ratio", "close_loc", "rsi14", "off_hi250",
                 "breadth50", "mkt_dma200"]
@@ -72,6 +76,12 @@ def run_backtest(daily: pd.DataFrame | None = None, feats: pd.DataFrame | None =
     return bt
 
 
+def publishable(sigs: list[dict], now: pd.Timestamp) -> tuple[list[dict], list[dict]]:
+    """(still actionable, too late): a signal can be acted on until 15:00 PKT of its entry day."""
+    ok = [x for x in sigs if now < x["entry_date"] + PUBLISH_CUTOFF]
+    return ok, [x for x in sigs if not now < x["entry_date"] + PUBLISH_CUTOFF]
+
+
 def run_live(daily: pd.DataFrame | None = None, now: pd.Timestamp | None = None,
              publish: bool = True, feats: pd.DataFrame | None = None) -> list[dict]:
     daily = daily if daily is not None else _daily()
@@ -83,6 +93,10 @@ def run_live(daily: pd.DataFrame | None = None, now: pd.Timestamp | None = None,
     today = feats[feats["date"] == asof]
     sigs = [x for x in dividend.generate(ev, today, asof, cal) if x["type"] in dividend.PUBLISHED_TYPES]
     now = now or pd.Timestamp.now(tz="Asia/Karachi").tz_localize(None)
+    sigs, late = publishable(sigs, now)
+    if late:
+        log.warning("not publishing %d signal(s) for %s: their buy window has passed (%s)", len(late),
+                    asof.date(), ", ".join(x["symbol"] for x in late))
     if publish:
         ledger.publish(sigs, asof, now)
     return sigs
