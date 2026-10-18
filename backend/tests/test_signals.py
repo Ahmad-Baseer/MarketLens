@@ -169,3 +169,16 @@ def test_kse30_row_parsing():
     assert _outgoing("TPLP TPL Properties Limited PIOC Pioneer Cement Limited", syms, False, names) == "PIOC"
     assert _outgoing("Ghandhara Industries Limited Bank Alfalah Limited", syms, False, names) == "BAFL"
     assert _outgoing("Bank Alfalah Limited Ghandhara Industries Limited", syms, True, names) == "BAFL"
+
+# ------------------------------------------------------------------ live record vs replay
+def test_live_signal_supersedes_its_backtest_twin(tmp_path, monkeypatch):
+    from mbf import config
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    base = {"type": "DIV_K5", "symbol": "ABC", "signal_date": pd.Timestamp("2026-10-14")}
+    (tmp_path / "ledger").mkdir()
+    pd.DataFrame([dict(base, id="A", mode="live")]).to_parquet(tmp_path / "ledger" / "signals.parquet")
+    pd.DataFrame([dict(base, id="A", mode="backtest"), dict(base, id="B", mode="backtest")]).to_parquet(
+        tmp_path / "ledger" / "backtest.parquet")
+    s = ledger.load("all")
+    assert sorted(s["id"]) == ["A", "B"]
+    assert s.set_index("id").loc["A", "mode"] == "live"
