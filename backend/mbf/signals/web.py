@@ -238,7 +238,7 @@ def write_all(daily: pd.DataFrame, feats: pd.DataFrame, cal: Calendar,
     # a live signal supersedes its backtest twin
     sig = sig.sort_values("mode", key=lambda m: m.map({"live": 0, "preview": 1, "backtest": 2})).drop_duplicates("id")
     st = stats(sig, out)
-    o_by = out.set_index("id") if not out.empty else pd.DataFrame()
+    o_by = out.drop_duplicates("id").set_index("id") if not out.empty else pd.DataFrame()
     asof = cal.last
     nxt = cal.shift(asof, 1)
     feats_today = feats[feats["date"] == asof]
