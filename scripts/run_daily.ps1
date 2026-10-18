@@ -14,12 +14,32 @@ $log = Join-Path $root ("data\logs\{0}_{1:yyyy-MM-dd}.log" -f $kind, (Get-Date))
 New-Item -ItemType Directory -Force (Split-Path $log) | Out-Null
 Set-Location $root
 $py = "$root\.venv\Scripts\python.exe"
-"=== $(Get-Date -Format s) $kind start" | Out-File -Append -Encoding utf8 $log
-& $py -c "import sys; from mbf import jobs; sys.exit(1 if jobs.needs_bootstrap() else 0)" 2>$null
-if ($LASTEXITCODE -ne 0) { & $py -u -m mbf bootstrap *>> $log }
-# 3 retries, 30 minutes apart: the network is often not back yet right after the laptop wakes
-if ($Weekly) { & $py -u -m mbf weekly --retries 3 *>> $log }
-else { & $py -u -m mbf update --retries 3 *>> $log }
-$code = $LASTEXITCODE
-"=== $(Get-Date -Format s) $kind exit $code" | Out-File -Append -Encoding utf8 $log
+$env:PYTHONIOENCODING = "utf-8"
+# Everything goes to the log as UTF-8 text (PowerShell's own *>> would write UTF-16 and
+# mix encodings in one file). Python logs to stderr, so 2>&1 and stringify each line.
+function Run([string[]]$a) {
+    & $py -u -m mbf @a 2>&1 | ForEach-Object { "$_" } | Out-File -Append -Encoding utf8 $log
+    return $LASTEXITCODE
+}
+# One job at a time. If both catch-ups start together (laptop off Friday evening and
+# Saturday), the second waits here instead of writing the same data files at once.
+# A Windows mutex is released automatically if the holder dies.
+$mutex = New-Object System.Threading.Mutex($false, "Local\MarketLensDataJob")
+$owned = $false
+try { $owned = $mutex.WaitOne([TimeSpan]::FromHours(3)) }
+catch [System.Threading.AbandonedMutexException] { $owned = $true }
+if (-not $owned) {
+    "=== $(Get-Date -Format s) $kind skipped: another MarketLens job held the lock for 3 hours" |
+        Out-File -Append -Encoding utf8 $log
+    exit 3
+}
+try {
+    "=== $(Get-Date -Format s) $kind start" | Out-File -Append -Encoding utf8 $log
+    & $py -c "import sys; from mbf import jobs; sys.exit(1 if jobs.needs_bootstrap() else 0)" 2>$null
+    if ($LASTEXITCODE -ne 0) { $null = Run @("bootstrap") }
+    # 3 retries, 30 minutes apart: the network is often not back yet right after the laptop wakes
+    $code = if ($Weekly) { Run @("weekly", "--retries", "3") } else { Run @("update", "--retries", "3") }
+    "=== $(Get-Date -Format s) $kind exit $code" | Out-File -Append -Encoding utf8 $log
+}
+finally { $mutex.ReleaseMutex() }
 exit $code
