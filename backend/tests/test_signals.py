@@ -170,6 +170,7 @@ def test_kse30_row_parsing():
     assert _outgoing("Ghandhara Industries Limited Bank Alfalah Limited", syms, False, names) == "BAFL"
     assert _outgoing("Bank Alfalah Limited Ghandhara Industries Limited", syms, True, names) == "BAFL"
 
+
 # ------------------------------------------------------------------ live record vs replay
 def test_live_signal_supersedes_its_backtest_twin(tmp_path, monkeypatch):
     from mbf import config
@@ -183,6 +184,7 @@ def test_live_signal_supersedes_its_backtest_twin(tmp_path, monkeypatch):
     assert sorted(s["id"]) == ["A", "B"]
     assert s.set_index("id").loc["A", "mode"] == "live"
 
+
 @pytest.mark.parametrize("now,ok", [
     ("2026-10-19 08:00", True),     # catch-up on the morning of the buy day
     ("2026-10-19 14:59", True),
@@ -194,3 +196,20 @@ def test_signal_only_published_while_actionable(now, ok):
     sig = {"id": "X", "symbol": "ABC", "entry_date": pd.Timestamp("2026-10-19")}
     good, late = publishable([sig], pd.Timestamp(now))
     assert (len(good) == 1) == ok and (len(late) == 1) != ok
+
+
+# ------------------------------------------------------------------ fundamentals snapshots
+def test_latest_fundamentals_take_each_company_from_its_newest_snapshot(tmp_path, monkeypatch):
+    """A weekday evening refreshes only that day's reporters; the newest snapshot is partial."""
+    from mbf import config, fundamentals
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    full = tmp_path / "fundamentals" / "snapshots" / "2026-10-18"
+    part = tmp_path / "fundamentals" / "snapshots" / "2026-10-19"
+    full.mkdir(parents=True)
+    part.mkdir(parents=True)
+    pd.DataFrame({"symbol": ["A", "B", "C"], "shares": [1, 2, 3]}).to_parquet(full / "equity.parquet")
+    pd.DataFrame({"symbol": ["A"], "shares": [10]}).to_parquet(part / "equity.parquet")
+    eq = fundamentals.latest("equity").set_index("symbol")
+    assert sorted(eq.index) == ["A", "B", "C"]
+    assert eq.loc["A", "shares"] == 10 and eq.loc["B", "shares"] == 2
+    assert eq.loc["A", "snapshot"] == pd.Timestamp("2026-10-19")
