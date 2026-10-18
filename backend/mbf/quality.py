@@ -8,7 +8,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from mbf import config, store
+from mbf import config, fundamentals, store
 from mbf.adjust import equities, non_equity_symbols
 
 log = logging.getLogger(__name__)
@@ -237,16 +237,15 @@ def other_tables() -> str:
         g = idx.groupby("symbol")["date"].agg(["min", "max", "size"])
         lines.append("- Indices: " + "; ".join(f"{k} {r['min'].date()}->{r['max'].date()} ({r['size']})"
                                                 for k, r in g.iterrows()))
-    snaps = sorted((config.DATA_DIR / "fundamentals" / "snapshots").glob("*"))
-    if snaps:
-        sd = snaps[-1]
-        info = pd.read_parquet(sd / "info.parquet")
-        q = pd.read_parquet(sd / "quote.parquet")
-        eqp = pd.read_parquet(sd / "equity.parquet")
-        f = pd.read_parquet(sd / "financials.parquet")
+    info = fundamentals.latest("info")
+    if not info.empty:
+        q = fundamentals.latest("quote")
+        eqp = fundamentals.latest("equity")
+        f = fundamentals.latest("financials")
         n = len(info)
         has = lambda kind, item: f[(f.kind == kind) & (f.item == item)]["symbol"].nunique() / max(n, 1)
-        lines.append(f"- Fundamentals snapshot {sd.name}: {n} companies; P/E (TTM) present "
+        lines.append(f"- Fundamentals (latest per company, {info['snapshot'].min().date()} to "
+                     f"{info['snapshot'].max().date()}): {n} companies; P/E (TTM) present "
                      f"{_pct(q['pe_ttm'].notna().mean())}, market cap {_pct(eqp['market_cap_000'].notna().mean())}, "
                      f"annual EPS {_pct(has('annual', 'EPS'))}, quarterly EPS {_pct(has('quarterly', 'EPS'))}, "
                      f"sales {_pct(has('annual', 'Sales'))} (banks report mark-up instead)")
