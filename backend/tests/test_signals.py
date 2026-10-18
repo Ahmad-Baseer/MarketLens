@@ -182,3 +182,15 @@ def test_live_signal_supersedes_its_backtest_twin(tmp_path, monkeypatch):
     s = ledger.load("all")
     assert sorted(s["id"]) == ["A", "B"]
     assert s.set_index("id").loc["A", "mode"] == "live"
+
+@pytest.mark.parametrize("now,ok", [
+    ("2026-10-19 08:00", True),     # catch-up on the morning of the buy day
+    ("2026-10-19 14:59", True),
+    ("2026-10-19 15:00", False),    # the last half hour has started
+    ("2026-10-20 09:00", False),    # the buy day is over
+])
+def test_signal_only_published_while_actionable(now, ok):
+    from mbf.signals.engine import publishable
+    sig = {"id": "X", "symbol": "ABC", "entry_date": pd.Timestamp("2026-10-19")}
+    good, late = publishable([sig], pd.Timestamp(now))
+    assert (len(good) == 1) == ok and (len(late) == 1) != ok
