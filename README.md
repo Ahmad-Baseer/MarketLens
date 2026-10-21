@@ -98,7 +98,9 @@ ex-date's opening auction with the dividend collected. Replayed day by day since
 
 ```
 .venv\Scripts\python -m mbf signals --dry-run   # only needed if data/web doesn't exist yet
-cd web && npm install && npm run dev            # http://localhost:3000
+cd web && npm install && npm run dev            # http://localhost:3200
+OR
+npm --prefix web run dev
 ```
 
 Details, configuration and the invite-code gate: `web/README.md`.

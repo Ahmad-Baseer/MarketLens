@@ -18,7 +18,7 @@ evening job writes to `data/web/`. There is no database and no API of its own.
 .venv\Scripts\python -m mbf signals --dry-run
 cd web
 npm install
-npm run dev        # http://localhost:3000
+npm run dev        # http://localhost:3200 (port set in package.json; 3000 is left free)
 ```
 
 ## Configuration (environment variables)
