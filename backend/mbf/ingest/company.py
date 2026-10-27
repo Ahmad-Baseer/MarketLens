@@ -19,25 +19,44 @@ from mbf.psx.parsers import parse_company, parse_company_reports
 
 log = logging.getLogger(__name__)
 
+# The report list is a separate PSX page that can go down on its own (2026-10-23: HTTP 500
+# for every company while the company pages were fine). Each failure costs ~35 s of client
+# retries, which across a 760-company weekly sweep would overrun the job's time limit.
+REPORTS_GIVE_UP = 3          # consecutive report-list failures before the sweep stops asking
+
 
 def sweep(client: PSXClient, symbols: list[str], with_reports: bool = True,
           snapshot_date: date | None = None, progress_every: int = 50) -> dict:
     snap = snapshot_date or pd.Timestamp.now(tz=config.TZ).date()
     info, quote, equity, fins, ratios, reports, failed = [], [], [], [], [], [], []
+    reports_failed, in_a_row = [], 0
     t0 = time.monotonic()
     for i, s in enumerate(symbols, 1):
         try:
             c = parse_company(client.company(s), s)
             info.append(c["info"]); quote.append(c["quote"]); equity.append(c["equity"])
             fins.append(c["financials"]); ratios.append(c["ratios"])
-            if with_reports:
-                reports.append(parse_company_reports(client.company_reports(s), s))
         except PSXError as e:
             log.warning("company %s: %s", s, e)
             failed.append(s)
+            c = None
         except Exception as e:                       # a parser surprise must not kill the sweep
             log.exception("company %s: unexpected %s", s, e)
             failed.append(s)
+            c = None
+        # the company's figures are already in hand: a missing report list doesn't fail it
+        if c is not None and with_reports:
+            try:
+                reports.append(parse_company_reports(client.company_reports(s), s))
+                in_a_row = 0
+            except Exception as e:
+                log.warning("company %s reports: %s", s, e)
+                reports_failed.append(s)
+                in_a_row += 1
+                if in_a_row >= REPORTS_GIVE_UP:
+                    with_reports = False
+                    log.warning("reports: %d failures in a row, not asking for report lists "
+                                "for the rest of this sweep", in_a_row)
         if i % progress_every == 0 or i == len(symbols):
             el = time.monotonic() - t0
             log.info("company: %d/%d failed=%d eta=%dm", i, len(symbols), len(failed),
@@ -55,9 +74,11 @@ def sweep(client: PSXClient, symbols: list[str], with_reports: bool = True,
         df["snapshot"] = pd.Timestamp(snap)
         out[name] = len(_upsert(df, store.path("fundamentals", "snapshots", d, f"{name}.parquet"), swept))
         _merge_first_seen(df, name)
-    if with_reports and reports:
+    if reports:
         _merge_reports(pd.concat(reports, ignore_index=True))
     out["failed"] = failed
+    out["reports_failed"] = len(reports_failed)
+    out["reports_skipped"] = len(symbols) - len(failed) - len(reports) - len(reports_failed)
     log.info("company sweep %s: %s", d, {k: v for k, v in out.items() if k != "failed"})
     return out
 
