@@ -1,6 +1,8 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from mbf import config, jobs
+import pandas as pd
+
+from mbf import config, jobs, store
 
 
 def test_schedule_weekdays_evening_and_saturday_maintenance():
@@ -30,3 +32,13 @@ def test_run_job_records_failure_without_raising(tmp_path, monkeypatch):
 def test_needs_bootstrap_on_empty_store(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     assert jobs.needs_bootstrap()
+
+
+def test_announcements_window_covers_days_the_machine_was_off(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    p = store.path("events", "announcements.parquet")
+    last = date(2026, 10, 26)
+    store.write_parquet(pd.DataFrame({"announced_at": [pd.Timestamp("2026-10-23 15:10")]}), p)
+    assert jobs.announcements_since(last) == date(2026, 10, 21)        # usual 5-day re-read
+    store.write_parquet(pd.DataFrame({"announced_at": [pd.Timestamp("2026-10-02 16:00")]}), p)
+    assert jobs.announcements_since(last) == date(2026, 9, 30)         # off for 3 weeks
