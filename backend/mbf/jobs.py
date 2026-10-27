@@ -98,13 +98,15 @@ def daily_update(full_sweep: bool = False) -> dict:
                      & ann["title"].str.contains("financial result", case=False, na=False)]
         eq = reference.equity_symbols()
         syms = eq if full_sweep else sorted(set(recent["symbol"]) & set(eq))
-        if syms:
-            company.sweep(c, syms, with_reports=True)
+        sw = company.sweep(c, syms, with_reports=True) if syms else {}
         requests = c.requests
     from mbf.signals import engine
     sig = engine.run_evening(daily)
     return {"prices": {k: (v if k != "failed" else [str(d) for d in v]) for k, v in res.items()},
-            "companies_refreshed": len(syms), "psx_requests": requests,
+            "companies_refreshed": len(syms) - len(sw.get("failed", [])),
+            "companies_failed": sw.get("failed", []),
+            "report_lists_missing": sw.get("reports_failed", 0) + sw.get("reports_skipped", 0),
+            "psx_requests": requests,
             "last_session": str(last), "signals": sig}
 
 
