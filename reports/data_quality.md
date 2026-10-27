@@ -1,14 +1,14 @@
-# Data-quality report — 2026-10-18
+# Data-quality report — 2026-10-24
 
 Source: PSX Data Portal (dps.psx.com.pk). Independent check: legacy AKD pulls.
 
 ## 1. Coverage
 
-- Range: **2000-01-03 -> 2026-10-16**, 6,613 trading days, 377 weekday holidays/closures detected
-- Research-grade (modern) era: **2013-11-04 -> 2026-10-16**, 3,208 trading days — see section 7
+- Range: **2000-01-03 -> 2026-10-23**, 6,618 trading days, 377 weekday holidays/closures detected
+- Research-grade (modern) era: **2013-11-04 -> 2026-10-23**, 3,213 trading days — see section 7
 - Weekdays with no file (fetch failed, needs a retry): **0**
-- Calendar check vs PSX's KSE-100 series: since 2021-10-13: 1243 KSE-100 sessions vs 1243 of ours; 0 index days missing from our data, 0 extra days in ours
-- Equity rows: 2,486,457 raw, 2,470,278 after cleaning; 1,705 distinct equity symbols ever listed
+- Calendar check vs PSX's KSE-100 series: since 2021-10-13: 1248 KSE-100 sessions vs 1248 of ours; 0 index days missing from our data, 0 extra days in ours
+- Equity rows: 2,488,939 raw, 2,472,760 after cleaning; 1,707 distinct equity symbols ever listed
 
 Per year (equities only: futures, bonds, T-bills, sukuks and index codes excluded):
 
@@ -40,7 +40,7 @@ Per year (equities only: futures, bonds, T-bills, sukuks and index codes exclude
 | 2023 | 246 | 343 | 338 |
 | 2024 | 246 | 444 | 442 |
 | 2025 | 250 | 477 | 477 |
-| 2026 | 196 | 490 | 490 |
+| 2026 | 201 | 490 | 490 |
 
 
 ## 2. Daily returns vs AKD
@@ -86,14 +86,14 @@ Largest disagreements (either source may be the wrong one):
 
 ## 3. Corporate actions vs AKD
 
-AKD payout events since 2018 with PSX prices on both sides: **3,096**. Found as an LDCP adjustment within ±5 sessions: **93.9%**.
-- Cash dividends: PSX-implied amount matches AKD's within 2%: **99.3%** of 2,567
-- PSX detected 3,406 adjustments since 2018 in total (AKD's file also misses some, e.g. rights and splits).
+AKD payout events since 2018 with PSX prices on both sides: **3,152**. Found as an LDCP adjustment within ±5 sessions: **93.9%**.
+- Cash dividends: PSX-implied amount matches AKD's within 2%: **99.3%** of 2,620
+- PSX detected 3,460 adjustments since 2018 in total (AKD's file also misses some, e.g. rights and splits).
 
 | kind | AKD events | found in PSX LDCP |
 |---|---|---|
-| cash dividend | 2707 | 94.8% |
-| bonus | 290 | 90.7% |
+| cash dividend | 2762 | 94.9% |
+| bonus | 291 | 90.7% |
 | rights | 101 | 76.2% |
 
 Where PSX puts the event relative to AKD's ex-date:
@@ -104,8 +104,8 @@ Where PSX puts the event relative to AKD's ex-date:
 | -4 | 6 |
 | -3 | 8 |
 | -2 | 367 |
-| -1 | 2061 |
-| 0 | 329 |
+| -1 | 2069 |
+| 0 | 375 |
 | 1 | 47 |
 | 2 | 25 |
 | 3 | 28 |
@@ -116,6 +116,8 @@ Most recent AKD events with no PSX adjustment nearby:
 
 | symbol | ex_date | div_rs | bonus_r | right_r |
 |---|---|---|---|---|
+| PRET | 2026-10-20 | 15.000 | 0.000 | 0.000 |
+| GIL | 2026-10-19 | 3.000 | 0.000 | 0.000 |
 | NICL | 2026-09-12 | 2.000 | 0.000 | 0.000 |
 | WAVESAPP | 2026-08-25 | 0.000 | 0.000 | 0.560 |
 | FPRM | 2026-07-17 | 0.000 | 0.000 | 0.500 |
@@ -126,20 +128,18 @@ Most recent AKD events with no PSX adjustment nearby:
 | MFFL | 2026-03-16 | 0.000 | 0.000 | 0.121 |
 | WASL | 2026-03-02 | 0.000 | 0.000 | 0.242 |
 | FCL | 2025-10-06 | 0.500 | 0.025 | 0.000 |
-| GIL | 2025-10-03 | 3.000 | 0.000 | 0.000 |
-| CSIL | 2025-04-22 | 0.000 | 0.000 | 0.380 |
 
 
 ## 4. Suspicious moves
 
-Rows flagged `suspect` (daily move beyond any circuit breaker PSX has used: > max(30%, Rs 1.5)): **912** of 2,327,218 traded rows (0.039%). Mostly thinly traded small stocks in 2000-2005; research excludes them. Modern era only: **13** of 1,220,977 traded rows (0.0011%).
+Rows flagged `suspect` (daily move beyond any circuit breaker PSX has used: > max(30%, Rs 1.5)): **912** of 2,329,700 traded rows (0.039%). Mostly thinly traded small stocks in 2000-2005; research excludes them. Modern era only: **13** of 1,223,459 traded rows (0.0011%).
 
 | year | suspect rows |
 |---|---|
-| 2000 | 393 |
+| 2000 | 394 |
 | 2001 | 203 |
 | 2002 | 35 |
-| 2003 | 73 |
+| 2003 | 72 |
 | 2004 | 67 |
 | 2005 | 38 |
 | 2006 | 18 |
@@ -180,9 +180,9 @@ LDCP gaps not applied as corporate actions: 145 ({'after_gap': 138, 'implausible
 
 ## 5. Market proxy vs KSE-100
 
-Two proxies, 2000-01-04 -> 2026-10-16: **CW** = top-100 by estimated free-float market cap, cap-weighted (KSE-100's own method); **EW** = 100 most-traded stocks, equal-weighted (the 'average liquid stock'). Compared with PSX's KSE-100 on 1,242 common days:
+Two proxies, 2000-01-04 -> 2026-10-23: **CW** = top-100 by estimated free-float market cap, cap-weighted (KSE-100's own method); **EW** = 100 most-traded stocks, equal-weighted (the 'average liquid stock'). Compared with PSX's KSE-100 on 1,247 common days:
 - Daily correlation: CW **0.996** (beta 1.02), EW **0.925** (beta 1.20)
-- Cumulative over the overlap: KSE-100 +285.0% (price only); CW +240.2%, EW +125.3% (both include dividends)
+- Cumulative over the overlap: KSE-100 +275.7% (price only); CW +231.1%, EW +116.6% (both include dividends)
 
 CW coverage by year — share of traded value in names with a known share count (falls in early years as since-delisted companies drop out):
 
@@ -220,12 +220,12 @@ CW coverage by year — share of traded value in names with a known share count 
 
 ## 6. Other tables
 
-- Symbols: 1,044 listed, 758 equities, 38 sectors
-- Indices: ALLSHR 2021-10-13->2026-10-16 (1243); KMI30 2021-10-13->2026-10-16 (1243); KMIALLSHR 2021-10-13->2026-10-16 (1243); KSE100 2021-10-13->2026-10-16 (1243); KSE30 2021-10-13->2026-10-16 (1243); PSXDIV20 2022-09-05->2026-10-16 (1022)
-- Fundamentals (latest per company, 2026-10-18 to 2026-10-18): 758 companies; P/E (TTM) present 50.0%, market cap 100.0%, annual EPS 79.9%, quarterly EPS 73.2%, sales 60.8% (banks report mark-up instead)
-- Report PDFs listed: 21,285 across 624 companies (15,208 quarterly, 6,077 annual)
-- Payouts: 724 components, 2024-11-04 -> 2026-10-06; unparsed kind: 0.0%
-- Announcements: 50,558, 2024-01-01 -> 2026-10-16
+- Symbols: 1,050 listed, 760 equities, 38 sectors
+- Indices: ALLSHR 2021-10-13->2026-10-23 (1248); KMI30 2021-10-13->2026-10-23 (1248); KMIALLSHR 2021-10-13->2026-10-23 (1248); KSE100 2021-10-13->2026-10-23 (1248); KSE30 2021-10-13->2026-10-23 (1248); PSXDIV20 2022-09-05->2026-10-23 (1027)
+- Fundamentals (latest per company, 2026-10-24 to 2026-10-24): 760 companies; P/E (TTM) present 49.9%, market cap 100.0%, annual EPS 79.7%, quarterly EPS 73.0%, sales 60.7% (banks report mark-up instead)
+- Report PDFs listed: 21,292 across 624 companies (15,215 quarterly, 6,077 annual)
+- Payouts: 738 components, 2024-11-04 -> 2026-10-22; unparsed kind: 0.0%
+- Announcements: 51,317, 2024-01-01 -> 2026-10-23
 - AKD seed announcements: 120,972 rows
 - AKD seed fundamentals: 297,316 rows
 - AKD seed statements: 1,004,814 rows

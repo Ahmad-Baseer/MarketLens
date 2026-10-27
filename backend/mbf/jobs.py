@@ -33,6 +33,16 @@ ANNOUNCEMENTS_SINCE = date(2024, 1, 1)
 
 
 # ------------------------------------------------------------------- jobs
+def announcements_since(last: date) -> date:
+    """The evening re-reads the last 5 days of announcements; after days with the machine
+    off, it reads back to the newest one already stored, so the gap is filled too."""
+    since = last - timedelta(days=5)
+    known = store.read_parquet(store.path("events", "announcements.parquet"))
+    if not known.empty:
+        since = min(since, known["announced_at"].max().date() - timedelta(days=2))
+    return since
+
+
 def bootstrap() -> dict:
     """Bring an empty (or partial) store to a complete state. Every stage is
     skipped if its output already exists, so this is cheap once done."""
@@ -93,18 +103,21 @@ def daily_update(full_sweep: bool = False) -> dict:
         from mbf.signals import calendar as sigcal
         sigcal.update_holidays(c)
         last = prices.last_closed_session()
-        ann = events.update_announcements(c, last - timedelta(days=5), last)
-        recent = ann[(ann["announced_at"] >= str(last - timedelta(days=5)))
+        since = announcements_since(last)
+        ann = events.update_announcements(c, since, last)
+        recent = ann[(ann["announced_at"] >= str(since))
                      & ann["title"].str.contains("financial result", case=False, na=False)]
         eq = reference.equity_symbols()
         syms = eq if full_sweep else sorted(set(recent["symbol"]) & set(eq))
-        if syms:
-            company.sweep(c, syms, with_reports=True)
+        sw = company.sweep(c, syms, with_reports=True) if syms else {}
         requests = c.requests
     from mbf.signals import engine
     sig = engine.run_evening(daily)
     return {"prices": {k: (v if k != "failed" else [str(d) for d in v]) for k, v in res.items()},
-            "companies_refreshed": len(syms), "psx_requests": requests,
+            "companies_refreshed": len(syms) - len(sw.get("failed", [])),
+            "companies_failed": sw.get("failed", []),
+            "report_lists_missing": sw.get("reports_failed", 0) + sw.get("reports_skipped", 0),
+            "psx_requests": requests,
             "last_session": str(last), "signals": sig}
 
 
