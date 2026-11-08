@@ -5,10 +5,10 @@
 # Registered in Windows Task Scheduler by scripts\register_tasks.ps1:
 #   "MarketLens evening update"       Mon-Fri 18:30  ->  run_daily.ps1
 #   "MarketLens weekly maintenance"   Sat 10:00      ->  run_daily.ps1 -Weekly
-#   "MarketLens catch-up check"       hourly, logon  ->  run_daily.ps1 -CatchUp
-# The first two also run as soon as possible after a missed start, but Windows doesn't
-# always manage it (Sat 2026-11-07 never ran), and a run cut off by sleep is never
-# repeated. -CatchUp runs whichever job has no run on record since its last scheduled time
+# Both also run as soon as possible after a missed start, but Windows doesn't always
+# manage it (Sat 2026-11-07 never ran), and a run cut off by sleep is never repeated.
+# -CatchUp, started by the tray icon's "Check scheduled jobs now" (and by setup.ps1 for the
+# first download), runs whichever job has no run on record since its last scheduled time
 # (`python -m mbf due`) and otherwise exits at once, writing nothing.
 param([switch]$Weekly, [switch]$CatchUp)
 
@@ -31,7 +31,7 @@ function Run([string[]]$a) {
     & $py -u -m mbf @a 2>&1 | ForEach-Object { "$_" } | Out-File -Append -Encoding utf8 $log
     return $LASTEXITCODE
 }
-# One job at a time. If both catch-ups start together (laptop off Friday evening and
+# One job at a time. If both missed starts fire together (laptop off Friday evening and
 # Saturday), the second waits here instead of writing the same data files at once.
 # A Windows mutex is released automatically if the holder dies. A -CatchUp run doesn't
 # wait: whichever job holds the lock is already bringing the data up to date.

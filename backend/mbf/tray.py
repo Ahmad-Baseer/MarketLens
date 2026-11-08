@@ -6,7 +6,7 @@
 Left-click opens the website, starting it if needed; right-click for the menu. The icon's
 colour is the state of the data:
   green  up to date                 blue  a job is running
-  amber  a scheduled run was missed (the hourly check or "Check scheduled jobs now" runs it)
+  amber  a scheduled run was missed ("Check scheduled jobs now" runs it)
   red    the last run failed        grey  scheduled jobs are paused
 Notifications: new signals, a failed run, a missed run being caught up, and the end of a
 run started from the menu. The website is the production build (`next start`, this
@@ -40,7 +40,7 @@ SCRIPT = config.ROOT / "scripts" / "run_daily.ps1"
 PYTHONW = config.ROOT / ".venv" / "Scripts" / "pythonw.exe"
 LOGS = config.DATA_DIR / "logs"
 POWERSHELL = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
-TASKS = ("MarketLens evening update", "MarketLens weekly maintenance", "MarketLens catch-up check")
+TASKS = ("MarketLens evening update", "MarketLens weekly maintenance")
 JOB_MUTEX = "Local\\MarketLensDataJob"        # held by scripts\run_daily.ps1 while a job runs
 TRAY_MUTEX = "Local\\MarketLensTray"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -523,9 +523,8 @@ class App:
         self.notify("MarketLens: evening update started", "You'll get a notification when it ends.")
 
     def stop_job(self):
-        if not confirm("MarketLens", "Stop the running job?\n\nIts data so far is kept. The hourly "
-                                     "catch-up check will run it again within the hour unless "
-                                     "you pause scheduled jobs."):
+        if not confirm("MarketLens", "Stop the running job?\n\nIts data so far is kept. The icon "
+                                     "turns amber, and \"Check scheduled jobs now\" runs it again."):
             return
         pids = job_pids()
         for pid in pids:
@@ -544,7 +543,8 @@ class App:
         set_paused(on)
         self.paused, self._tasks_at = tasks_paused(), time.monotonic()
         self.notify("MarketLens", "Scheduled jobs paused: nothing runs until you resume them."
-                    if on else "Scheduled jobs resumed; a run missed meanwhile is caught up within the hour.")
+                    if on else "Scheduled jobs resumed. For a run missed meanwhile, use "
+                               "\"Check scheduled jobs now\".")
 
     def toggle_startup(self):
         set_startup(not startup_enabled())

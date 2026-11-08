@@ -46,7 +46,7 @@ legacy/       the previous screener, research and AKD CSV pulls (kept for refere
    left-click it to open the website.
 
 The setup creates `.venv` and installs the Python packages, installs the website's
-packages and builds it, registers the three scheduled jobs, and sets up and starts the
+packages and builds it, registers the two scheduled jobs, and sets up and starts the
 tray icon. With `-DataFrom`, the new PC works exactly like the old one straight away.
 
 Re-running the setup is safe. It is also the fix after moving the project folder, which
@@ -55,9 +55,10 @@ breaks the Python install and the scheduled jobs.
 ### Starting without the old PC's data
 
 Nothing extra to do: run the setup without `-DataFrom` and it starts the first data
-download from PSX by itself when it finishes. That takes 4–5 hours in the background and
-carries on by itself if the PC sleeps or restarts (the tray icon is blue while it runs;
-progress in `data\logs\weekly_<date>.log`). The site fills in once it's done.
+download from PSX by itself when it finishes. That takes 4–5 hours in the background (the
+tray icon is blue while it runs; progress in `data\logs\weekly_<date>.log`) and carries on
+after sleep. If the PC restarts meanwhile, right-click the tray icon and choose **Check
+scheduled jobs now**: it resumes where it stopped. The site fills in once it's done.
 
 What you don't get back this way:
 - **The live signal record** starts empty: it exists only in the old `data` folder.
@@ -92,13 +93,13 @@ In step 5 this process is packaged as a container next to the web app, so a
 deploy is "start the container" and that's it.
 
 **On a laptop until deployment** (it sleeps, so a long-running process is awkward):
-`powershell -File scripts\register_tasks.ps1` registers three Windows scheduled tasks
-for the current user: "MarketLens evening update" (Mon–Fri 18:30), "MarketLens
-weekly maintenance" (Sat 10:00) and "MarketLens catch-up check" (hourly and at logon).
-The check runs whichever job has no run on record since its last scheduled time
-(`mbf due`), covering a start Windows missed while the laptop slept and a run that
-sleep cut off; otherwise it exits in about a second. All run on battery and retry
-3 times 30 minutes apart; logs go to `data\logs\`. The first run bootstraps if needed.
+`powershell -File scripts\register_tasks.ps1` registers two Windows scheduled tasks
+for the current user: "MarketLens evening update" (Mon–Fri 18:30) and "MarketLens
+weekly maintenance" (Sat 10:00). Both run on battery and retry 3 times 30 minutes
+apart; logs go to `data\logs\`. The first run bootstraps if needed. Windows starts a
+missed run when the laptop wakes, but not always, and never repeats a run that sleep cut
+off: for those, the tray icon turns amber, and **Check scheduled jobs now** in its menu
+runs whichever job has no run on record since its last scheduled time (`mbf due`).
 
 **Tray icon** (`backend/mbf/tray.py`; `.venv\Scripts\pythonw.exe -m mbf.tray`, set up by
 `setup.ps1`). Left-click opens the website, starting it if needed: the production build

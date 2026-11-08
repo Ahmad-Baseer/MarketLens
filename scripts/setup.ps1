@@ -11,7 +11,7 @@
 #
 # Needs Python 3.11+ and Node.js 20.9+ (Next.js 16) installed, and an internet connection.
 # What it does: Python environment and packages, website packages and production build,
-# the three scheduled jobs, the tray icon (started now, and at logon if chosen), and the
+# the two scheduled jobs, the tray icon (started now, and at logon if chosen), and the
 # first data download if there is no data yet.
 param([switch]$Startup, [switch]$NoStartup, [string]$DataFrom)
 
@@ -84,10 +84,16 @@ Write-Host "Tray icon started (look for the MarketLens icon by the clock; it may
 
 if ($needsData) {
     Step "First data download"
-    Start-ScheduledTask -TaskName "MarketLens catch-up check"
+    # started directly, not as a scheduled task, so the tasks' 4-hour limit doesn't cut it off
+    $ps = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+    $job = Join-Path $PSScriptRoot "run_daily.ps1"
+    Start-Process $ps -WindowStyle Hidden -WorkingDirectory $root `
+        -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$job`" -CatchUp"
     Write-Host ("Started in the background: 4-5 hours for 26 years of PSX prices, fundamentals and " +
-                "announcements. The tray icon is blue while it runs; if the PC sleeps or restarts " +
-                "it carries on where it stopped. Progress: data\logs\weekly_<date>.log")
+                "announcements. The tray icon is blue while it runs. It carries on after sleep; " +
+                "after a restart, click 'Check scheduled jobs now' in the tray menu and it resumes " +
+                "where it stopped (the next scheduled run would also resume it). " +
+                "Progress: data\logs\weekly_<date>.log")
 }
 
 Step "Done"
