@@ -1,5 +1,7 @@
 import json
 import os
+import threading
+import time
 from datetime import datetime
 
 import pytest
@@ -88,3 +90,19 @@ def test_listener_pid_follows_the_port_in_package_json(monkeypatch):
     out = "  TCP    127.0.0.1:3200   0.0.0.0:0   LISTENING   8800\n  TCP    127.0.0.1:3299   0.0.0.0:0   LISTENING   4242\n"
     monkeypatch.setattr(tray, "web_port", lambda: 3299)
     assert tray.listener_pid(out) == 4242
+
+
+def test_polling_loop_ends_on_quit(monkeypatch):
+    # pystray waits for this thread when the process exits: a loop that never ends kept a
+    # quit tray alive, hidden, holding its single-instance mutex
+    monkeypatch.setattr(tray, "POLL_S", 60)
+    app = tray.App.__new__(tray.App)                 # no real icon needed
+    app._quitting, app.site_proc = threading.Event(), None
+    app.refresh = lambda: None
+    app.icon = type("FakeIcon", (), {"stop": lambda self: None})()
+    t = threading.Thread(target=app._loop, args=(app.icon,), daemon=True)
+    t.start()
+    time.sleep(0.2)                                  # now waiting out the 60 s poll interval
+    app.quit()
+    t.join(2)
+    assert not t.is_alive()

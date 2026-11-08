@@ -301,6 +301,7 @@ class App:
         self._seen: dict = {}
         self._asked: str | None = None             # a run started from the menu: report its end
         self._tasks_at = 0.0
+        self._quitting = threading.Event()         # ends the polling loop
         self._images = {c: make_icon(c) for c in COLOURS}
         self.icon = pystray.Icon("MarketLens", self._images["grey"], "MarketLens", menu=self._menu())
 
@@ -316,13 +317,15 @@ class App:
 
     # ---- polling
     def _loop(self, icon):
+        # pystray runs this on a thread the interpreter waits for at exit: it has to end on Quit,
+        # or the process lives on hidden, holding the single-instance mutex
         icon.visible = True
-        while True:
+        while not self._quitting.is_set():
             try:
                 self.refresh()
             except Exception:
                 log.exception("refresh failed")
-            time.sleep(POLL_S)
+            self._quitting.wait(POLL_S)
 
     def refresh(self):
         now = datetime.now(jobs.TZ)
@@ -550,6 +553,7 @@ class App:
         set_startup(not startup_enabled())
 
     def quit(self):
+        self._quitting.set()
         if self.site_proc:
             try:
                 self.stop_site()
@@ -582,6 +586,12 @@ def main(argv=None):
         return
     log.info("tray started")
     App().run()
+    log.info("tray stopped")
+    logging.shutdown()
+    # Quit means gone: nothing still running in the background (a menu action mid-way, a
+    # status check stuck on a subprocess) may keep the process, and its mutex, alive.
+    # A data job started from the menu is a separate process and carries on.
+    os._exit(0)
 
 
 if __name__ == "__main__":
