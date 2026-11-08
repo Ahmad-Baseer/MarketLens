@@ -22,14 +22,48 @@ reports/      data_quality.md, research_step2.md, research_new_data.md, extracto
 legacy/       the previous screener, research and AKD CSV pulls (kept for reference)
 ```
 
-## Setup (development machine)
+## Setting up on a new Windows PC
 
-Needs Python 3.11+.
+1. **Install Python 3.11+** from https://www.python.org/downloads/ (tick *Add python.exe
+   to PATH*) and **Node.js 20.9+** (the LTS) from https://nodejs.org/.
+2. **Clone the repo:** `git clone https://github.com/Ahmad-Baseer/MarketLens.git`
+3. **If you have access to the old PC's data, copy its `data` folder across** (USB
+   drive, cloud folder, …). `data/` is not in git, and it holds the only copy of the
+   **live signal record** and the price, fundamentals and dividend history.
+   **No access to it?** Skip this step and leave `-DataFrom` out in step 4: see
+   [Starting without the old PC's data](#starting-without-the-old-pcs-data).
+4. **Run the setup**, in PowerShell from the repo folder:
 
-```
-python -m venv .venv
-.venv\Scripts\python -m pip install -e "backend[dev]"
-```
+   ```
+   powershell -ExecutionPolicy Bypass -File scripts\setup.ps1 -Startup -DataFrom E:\data
+   ```
+
+   - `-Startup` starts the tray icon when you log in to Windows; `-NoStartup` doesn't.
+     With neither, the script asks.
+   - `-DataFrom` is where you put the copied `data` folder (left out if you skipped
+     step 3).
+5. **Done.** The MarketLens icon sits by the clock (maybe under the ^ arrow);
+   left-click it to open the website.
+
+The setup creates `.venv` and installs the Python packages, installs the website's
+packages and builds it, registers the three scheduled jobs, and sets up and starts the
+tray icon. With `-DataFrom`, the new PC works exactly like the old one straight away.
+
+Re-running the setup is safe. It is also the fix after moving the project folder, which
+breaks the Python install and the scheduled jobs.
+
+### Starting without the old PC's data
+
+Nothing extra to do: run the setup without `-DataFrom` and it starts the first data
+download from PSX by itself when it finishes. That takes 4–5 hours in the background and
+carries on by itself if the PC sleeps or restarts (the tray icon is blue while it runs;
+progress in `data\logs\weekly_<date>.log`). The site fills in once it's done.
+
+What you don't get back this way:
+- **The live signal record** starts empty: it exists only in the old `data` folder.
+- **The dividend history** only goes back to November 2024, when PSX's payout feed
+  starts. If you have a copy of the old `legacy\akd_data` folder (also not in git), put
+  it in `legacy\` before running the setup and the history goes back to 2018.
 
 ## Running it — nothing is manual
 
