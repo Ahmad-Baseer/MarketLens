@@ -21,3 +21,6 @@ node_modules/
 
 # claude memory
 .claude
+
+# project memory
+CLAUDE.md
