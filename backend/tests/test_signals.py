@@ -107,6 +107,23 @@ def test_early_entry_on_announcement_evening():
     assert s[0]["entry_date"] == pd.Timestamp("2026-02-03")
 
 
+def test_replay_learns_of_a_dividend_one_session_after_it_is_announced():
+    # announced Thu 12 Feb, the evening before the K5 signal: live acts on it if PSX's
+    # payout list already shows it, the replay assumes the list shows it a session later
+    ev = _event(announced_at=pd.Timestamp("2026-02-12 15:30"))
+    lag = dividend.REPLAY_LAG
+    assert dividend.generate(ev, _feats(), pd.Timestamp("2026-02-12"), _cal(), lag=lag) == []
+    k5 = [x for x in dividend.generate(ev, _feats(), pd.Timestamp("2026-02-13"), _cal(), lag=lag)
+          if x["type"] == "DIV_K5"]
+    assert len(k5) == 1 and k5[0]["entry_date"] == pd.Timestamp("2026-02-16")
+    late = _event(announced_at=pd.Timestamp("2026-02-13 11:00"))      # same day as the signal
+    assert any(x["type"] == "DIV_K5" for x in dividend.generate(late, _feats(), pd.Timestamp("2026-02-13"), _cal()))
+    assert not dividend.generate(late, _feats(), pd.Timestamp("2026-02-13"), _cal(), lag=lag)
+    # the early entry moves to the session the replay first knows of it
+    s = dividend.generate(_event(), _feats(), pd.Timestamp("2026-02-03"), _cal(), lag=lag)
+    assert [x["type"] for x in s] == ["DIV_3W"] and s[0]["entry_date"] == pd.Timestamp("2026-02-04")
+
+
 # ------------------------------------------------------------------ outcome tracking
 def _daily(rows, start="2026-02-13"):
     d = pd.DataFrame(rows, columns=["open", "high", "low", "close", "traded"])

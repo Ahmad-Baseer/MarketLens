@@ -181,7 +181,9 @@ export default async function HowItWorks() {
           </li>
           <li>
             <b className="text-ink">Backtest and live are labelled separately.</b> Backtest signals are the same engine
-            replayed over past data, seeing only what was known each evening. See the <Link href="/history" className="text-brand underline">history</Link>.
+            replayed over past data, seeing only what was known each evening. PSX&apos;s payout list usually shows a
+            dividend the trading day after it is announced, so the replay only acts on it from then, never earlier
+            than the live engine could. See the <Link href="/history" className="text-brand underline">history</Link>.
           </li>
           <li>
             <b className="text-ink">Limits.</b> Before November 2024 the dividend history comes from an earlier

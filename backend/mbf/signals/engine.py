@@ -59,7 +59,7 @@ def run_backtest(daily: pd.DataFrame | None = None, feats: pd.DataFrame | None =
     by_day = {d: g for d, g in feats.groupby("date")}
     # sessions on which something could trigger: the evening before a K5 entry, or
     # the announcement session (DIV_3W)
-    c = dividend.annotate(ev, cal)
+    c = dividend.annotate(ev, cal, dividend.REPLAY_LAG)
     trig = set()
     for r in c.itertuples():
         trig.add(cal.shift(r.k5_entry, -1))
@@ -69,7 +69,7 @@ def run_backtest(daily: pd.DataFrame | None = None, feats: pd.DataFrame | None =
     for d in trig:
         if d == s[-1]:
             continue                       # tonight's signals are the live run's job
-        sigs += dividend.generate(ev, by_day[d], d, cal)
+        sigs += dividend.generate(ev, by_day[d], d, cal, lag=dividend.REPLAY_LAG)
     bt = ledger.write_backtest(sigs)
     log.info("backtest: %d signals from %d trigger sessions (%s..%s)", len(bt), len(trig),
              trig[0].date() if trig else None, trig[-1].date() if trig else None)

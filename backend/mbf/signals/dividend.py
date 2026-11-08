@@ -36,6 +36,11 @@ TYPES = {
 # controls was t 1.8 in 2018-2022, short of the bar. It is still computed in the backtest for
 # transparency, but only these types are published.
 PUBLISHED_TYPES = ("DIV_K5",)
+# PSX's payout list, the only dividend source the evening run has, usually shows a dividend
+# the session after it is announced: of 39 announced 2026-10-16..11-02, 4 were listed by that
+# evening's run, 33 by the next session's and 2 later. The live run uses whatever the list
+# shows; the replay assumes the next session, so history never enters earlier than live could.
+REPLAY_LAG = 1
 
 
 def _known_by(announced_at: pd.Series, session: pd.Timestamp) -> pd.Series:
@@ -43,30 +48,34 @@ def _known_by(announced_at: pd.Series, session: pd.Timestamp) -> pd.Series:
     return announced_at <= session + pd.Timedelta(hours=18)
 
 
-def annotate(e: pd.DataFrame, cal: Calendar) -> pd.DataFrame:
-    """Add each event's K5 entry session and the session its announcement was
-    first actionable on (evening publication at 18:00 PKT)."""
+def annotate(e: pd.DataFrame, cal: Calendar, lag: int = 0) -> pd.DataFrame:
+    """Add each event's K5 entry session and the session its announcement was first
+    actionable on: the evening publication (18:00 PKT) on or after it, plus `lag`
+    sessions for PSX's payout list to show it."""
     e = e.copy()
     e["k5_entry"] = [cal.shift(x, -K) for x in e["ex_date"]]
-    e["ann_session"] = [cal.all[cal.all.searchsorted(a - pd.Timedelta(hours=18))]
-                        for a in e["announced_at"]]
+    first = [cal.all[cal.all.searchsorted(a - pd.Timedelta(hours=18))] for a in e["announced_at"]]
+    e["ann_session"] = [cal.shift(x, lag) for x in first] if lag else first
     return e
 
 
-def candidates(events: pd.DataFrame, asof: pd.Timestamp, cal: Calendar) -> pd.DataFrame:
+def candidates(events: pd.DataFrame, asof: pd.Timestamp, cal: Calendar,
+               lag: int = 0) -> pd.DataFrame:
     """Upcoming cash-dividend ex-dates known at `asof` (any yield), with their dates."""
     e = events[_known_by(events["announced_at"], asof) & (events["ex_date"] > asof)]
     if e.empty:
         return e
-    e = e.sort_values("announced_at").drop_duplicates(["symbol", "ex_date"], keep="last")
-    return annotate(e, cal)
+    e = annotate(e, cal, lag)
+    e = e[e["ann_session"] <= asof]
+    return e.sort_values("announced_at").drop_duplicates(["symbol", "ex_date"], keep="last")
 
 
 def generate(events: pd.DataFrame, feats: pd.DataFrame, asof: pd.Timestamp,
-             cal: Calendar) -> list[dict]:
-    """Signals to publish on the evening of session `asof`.
+             cal: Calendar, lag: int = 0) -> list[dict]:
+    """Signals to publish on the evening of session `asof`. `lag`: REPLAY_LAG when
+    replaying history, 0 live (the data then holds only what PSX actually listed).
     feats: one row per symbol for `asof` (close, atr_pct, in_universe, ...)."""
-    e = candidates(events, asof, cal)
+    e = candidates(events, asof, cal, lag)
     if e.empty:
         return []
     nxt = cal.shift(asof, 1)

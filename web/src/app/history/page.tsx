@@ -41,7 +41,8 @@ export default async function HistoryPage({ searchParams }: Props) {
       <h1 className="text-3xl font-semibold tracking-tight text-ink sm:text-4xl">History</h1>
       <p className="mt-2 max-w-3xl text-ink-2">
         Every dividend run-up signal since 2018 and what happened to it. Until the live record began, these are the
-        engine replayed day by day, seeing only what was known each evening. Results are after 0.6% costs and 15%
+        engine replayed day by day, seeing only what was known each evening (a dividend from the trading day after
+        its announcement, when PSX&apos;s payout list usually shows it). Results are after 0.6% costs and 15%
         dividend tax. A stop hit means the lower limit was reached before the ex-date.
       </p>
 
