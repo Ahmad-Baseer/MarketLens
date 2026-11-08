@@ -176,6 +176,34 @@ def run_job(name: str, fn, retries: int = 0, next_run: datetime | None = None) -
     return False
 
 
+def _last_slot(now: datetime, weekdays, at: tuple[int, int]) -> datetime:
+    for i in range(8):
+        d = (now - timedelta(days=i)).date()
+        t = datetime(d.year, d.month, d.day, *at, tzinfo=TZ)
+        if d.weekday() in weekdays and t <= now:
+            return t
+
+
+def due(now: datetime | None = None) -> str | None:
+    """The job ("weekly" or "update") with no run on record since its last scheduled time:
+    a start missed while the machine slept, or a run cut off before it finished (a run records
+    itself only when an attempt ends). A run that failed after its retries counts as done:
+    running it again wouldn't fix it."""
+    now = now or datetime.now(TZ)
+    st = read_status()
+
+    def ran_since(job: str, slot: datetime) -> bool:
+        started = (st.get(job) or {}).get("started")
+        return bool(started) and datetime.fromisoformat(started) >= slot
+
+    if not ran_since("weekly_maintenance", _last_slot(now, (5,), WEEKLY_AT)):
+        return "weekly"
+    evening = _last_slot(now, range(5), DAILY_AT)
+    if not (ran_since("daily_update", evening) or ran_since("weekly_maintenance", evening)):
+        return "update"                          # (the weekly job includes the evening update)
+    return None
+
+
 # -------------------------------------------------------------- scheduler
 def next_runs(now: datetime) -> list[tuple[datetime, str]]:
     """Upcoming (time, job) pairs within the next 8 days, soonest first."""

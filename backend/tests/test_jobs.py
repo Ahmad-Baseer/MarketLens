@@ -34,6 +34,27 @@ def test_needs_bootstrap_on_empty_store(tmp_path, monkeypatch):
     assert jobs.needs_bootstrap()
 
 
+def test_due_finds_missed_and_cut_off_runs(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    tz = jobs.TZ
+
+    def ran(job, at, ok=True):
+        jobs._record(job, ok, at, {}, None)
+
+    ran("weekly_maintenance", datetime(2026, 10, 31, 12, 8, tzinfo=tz))       # Sat 31 Oct
+    ran("daily_update", datetime(2026, 11, 6, 18, 30, 8, tzinfo=tz))          # Fri 6 Nov
+    sun = datetime(2026, 11, 8, 23, 0, tzinfo=tz)
+    assert jobs.due(sun) == "weekly"                       # Sat 7 Nov never started
+    ran("weekly_maintenance", datetime(2026, 11, 8, 23, 13, tzinfo=tz))
+    assert jobs.due(sun.replace(hour=23, minute=45)) is None
+    mon = datetime(2026, 11, 9, 17, 0, tzinfo=tz)
+    assert jobs.due(mon) is None                           # the weekly run covers Friday's evening
+    tue = datetime(2026, 11, 10, 9, 45, tzinfo=tz)
+    assert jobs.due(tue) == "update"                       # Mon 18:30 cut off by sleep: no record
+    ran("daily_update", datetime(2026, 11, 10, 9, 46, tzinfo=tz), ok=False)
+    assert jobs.due(tue.replace(hour=10, minute=45)) is None      # failed after its retries: done
+
+
 def test_announcements_window_covers_days_the_machine_was_off(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     p = store.path("events", "announcements.parquet")

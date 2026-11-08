@@ -139,6 +139,11 @@ def cmd_status(a):
     print(json.dumps(st, indent=2, default=str) if st else "no jobs have run yet")
 
 
+def cmd_due(a):
+    from mbf import jobs
+    print(jobs.due() or "")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="mbf", description="PSX signal provider — data pipeline",
                                  formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -192,6 +197,8 @@ def main(argv=None):
     p.add_argument("--run-now", action="store_true", help="also run the evening update immediately")
     p.set_defaults(fn=cmd_scheduler)
     sub.add_parser("status", help="last job results and next run").set_defaults(fn=cmd_status)
+    sub.add_parser("due", help="print the job that missed its last scheduled run (weekly/update), if any"
+                   ).set_defaults(fn=cmd_due)
 
     a = ap.parse_args(argv)
     _setup_logging(a.verbose)

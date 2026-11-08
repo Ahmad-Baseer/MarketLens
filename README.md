@@ -58,11 +58,13 @@ In step 5 this process is packaged as a container next to the web app, so a
 deploy is "start the container" and that's it.
 
 **On a laptop until deployment** (it sleeps, so a long-running process is awkward):
-`powershell -File scripts\register_tasks.ps1` registers two Windows scheduled tasks
-for the current user: "MarketLens evening update" (Mon–Fri 18:30) and "MarketLens
-weekly maintenance" (Sat 10:00). Both start as soon as possible after a missed start,
-run on battery, and retry 3 times 30 minutes apart; logs go to `data\logs\`. The
-first run bootstraps if needed.
+`powershell -File scripts\register_tasks.ps1` registers three Windows scheduled tasks
+for the current user: "MarketLens evening update" (Mon–Fri 18:30), "MarketLens
+weekly maintenance" (Sat 10:00) and "MarketLens catch-up check" (hourly and at logon).
+The check runs whichever job has no run on record since its last scheduled time
+(`mbf due`), covering a start Windows missed while the laptop slept and a run that
+sleep cut off; otherwise it exits in about a second. All run on battery and retry
+3 times 30 minutes apart; logs go to `data\logs\`. The first run bootstraps if needed.
 
 **One-shot / debugging:** `mbf bootstrap`, `mbf update [--full-sweep]`, and the
 individual stages (`backfill-prices`, `adjust`, `company-sweep`, `events`,
