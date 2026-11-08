@@ -66,6 +66,21 @@ The check runs whichever job has no run on record since its last scheduled time
 sleep cut off; otherwise it exits in about a second. All run on battery and retry
 3 times 30 minutes apart; logs go to `data\logs\`. The first run bootstraps if needed.
 
+**Tray icon** (`backend/mbf/tray.py`; `.venv\Scripts\pythonw.exe -m mbf.tray`, set up by
+`setup.ps1`). Left-click opens the website, starting it if needed: the production build
+on http://localhost:3200, this computer only, rebuilt first when the web code changed.
+The port is set in one place, the `start` script in `web/package.json`; the tray reads
+it from there.
+Right-click: start/stop the website, **check scheduled jobs now** (runs a missed evening
+or weekly job, then opens the site), the latest signals and open positions, recent runs
+(click one for its log), run the evening update now, stop the running job, open the
+latest log or the data folder, pause scheduled jobs, start with Windows. The icon is
+green when the data is up to date, blue while a job runs, amber when a scheduled run was
+missed, red when the last run failed and grey while paused. Notifications cover new
+signals, failed runs, catch-ups and the end of anything started from the menu. Its own
+log: `data\logs\tray.log`; the website's: `data\logs\web.log`. Start with Windows on/off
+from a terminal: `.venv\Scripts\python -m mbf.tray --startup on|off`.
+
 **One-shot / debugging:** `mbf bootstrap`, `mbf update [--full-sweep]`, and the
 individual stages (`backfill-prices`, `adjust`, `company-sweep`, `events`,
 `quality`, `signals [--dry-run]`, …) — see `python -m mbf --help`. Use
