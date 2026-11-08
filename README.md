@@ -129,7 +129,9 @@ dividend worth 2–7% of the price has been announced for a top-200 liquid stock
 in the last 30 minutes of the session 5 sessions before the ex-date (only up to
 1 ATR above the signal close), keep a protective stop 3 ATR below, and sell at the
 ex-date's opening auction with the dividend collected. Replayed day by day since
-2018: 584 signals, 59% winners, +0.69% average after 0.6% costs and 15% tax.
+2018, learning of each dividend the session after its announcement (when PSX's payout
+list usually shows it): 569 signals, 537 traded, 60% winners, +0.65% average after
+0.6% costs and 15% tax.
 
 - **Published signals are immutable.** Each evening's signals are written once to
   `data/ledger/published/<date>.json` and appended to `signals.parquet`; outcomes
